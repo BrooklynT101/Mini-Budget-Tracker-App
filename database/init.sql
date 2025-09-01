@@ -1,0 +1,2 @@
+-- this SQL will be a script that is mainly just for data seeding and schema changes for the 
+-- virtual machine handling the database to make changes as needed for testing   

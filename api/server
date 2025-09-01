@@ -1,0 +1,2 @@
+<!-- this file will be for serving the Node/Express server iteself, serving api routes  -->
+    <!-- for database interactions (using pg) for routes like /transactions -->
