@@ -1,3 +1,9 @@
-// this will be for declaring Node's dependencies for the API_VM (express), so that 
-// when new devs run scripts it ensures things are easily reproducble and 
-// automated especially 
+{
+  "name": "hello-api",
+  "version": "1.0.0",
+  "main": "server.js",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
