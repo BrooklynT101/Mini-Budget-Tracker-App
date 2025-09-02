@@ -1,11 +1,47 @@
 <!-- this file will be the static page that the web VM servers, later will be merged with some  -->
 <!-- javascript to call the api (e.g., fetch('http://localhost:3000/transactions')) -->
 
-    <!doctype html>
+<!doctype html>
 <html>
-  <head><meta charset="utf-8"><title>Web VM</title></head>
-  <body>
-    <h1>Hello from Web VM</h1>
-    <p>This is a static page served by Nginx on the web VM.</p>
-  </body>
+
+<head>
+  <meta charset="utf-8">
+  <title>Web VM</title>
+</head>
+
+<body>
+  <h1>Add Transaction</h1>
+  <button onClick="addTransaction()">Add</button>
+</body>
+
+<script>
+  async function addTransaction() {
+    const response = await fetch('http://localhost:3000/transactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        amount: 100,
+        description: 'Test Transaction'
+      })
+    });
+    if (response.ok) {
+      alert('Transaction added successfully!');
+    } else {
+      alert('Failed to add transaction.');
+    }
+  }
+
+  async function getTransactions() {
+    const response = await fetch('http://localhost:3000/transactions');
+    if (response.ok) {
+      const transactions = await response.json();
+      console.log('Transactions:', transactions);
+    } else {
+      console.error('Failed to fetch transactions.');
+    }
+  }
+</script>
+
 </html>

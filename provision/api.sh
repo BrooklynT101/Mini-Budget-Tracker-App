@@ -5,21 +5,30 @@ export DEBIAN_FRONTEND=noninteractive
 APP_SRC=/opt/api        # shared folder from host (Windows)
 APP_DIR=/srv/api        # native ext4 dir inside VM
 
-# --- avoid dpkg/apt lock races on Ubuntu 24.04 ---
-systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer || true
-systemctl disable unattended-upgrades apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer || true
-while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
-   || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
-  echo "[api] apt/dpkg locked...waiting"; sleep 5
-done
+# Stop/disable/mask background apt to avoid dpkg lock contention
+# suggested by ChatGPT due to numerous issues surrounding these
+systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+systemctl disable unattended-upgrades apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+systemctl mask apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
 
-# --- packages ---
-apt-get update -y
-apt-get install -y curl ca-certificates gnupg rsync
+apt_wait() {
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ||         fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+    echo "[apt] locked, waiting..."
+    sleep 3
+  done
+}
+apt_wait
+DEBIAN_FRONTEND=noninteractive apt-get update -y
+
+DEBIAN_FRONTEND=noninteractive apt-get install -y curl rsync ca-certificates gnupg
 
 # Node.js 20.x
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
+DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+
+install -d -m 0755 "$APP_DIR"
+rsync -a --delete "$APP_SRC"/ "$APP_DIR"/
 
 # --- copy app to ext4 and install deps there ---
 rm -rf "$APP_DIR"
@@ -28,22 +37,23 @@ rsync -a --delete "$APP_SRC/" "$APP_DIR/"
 
 cd "$APP_DIR"
 if [ -f package-lock.json ]; then
-  npm ci --omit=dev --no-audit --no-fund
+  npm ci --omit=dev
 else
-  npm install --omit=dev --no-audit --no-fund
+  npm install --omit=dev
 fi
 
 # --- systemd service (runs from /srv/api) ---
 cat >/etc/systemd/system/hello-api.service <<'UNIT'
 [Unit]
 Description=Hello API
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 WorkingDirectory=/srv/api
 Environment=PORT=3000
 ExecStart=/usr/bin/node /srv/api/server.js
-Restart=always
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
@@ -51,5 +61,4 @@ UNIT
 
 systemctl daemon-reload
 systemctl enable --now hello-api
-systemctl restart hello-api
-systemctl status --no-pager --lines=50 hello-api || true
+systemctl --no-pager --full status hello-api || true
