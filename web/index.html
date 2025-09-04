@@ -5,43 +5,58 @@
 <html>
 
 <head>
-  <meta charset="utf-8">
-  <title>Web VM</title>
+	<meta charset="utf-8">
+	<title>Web VM</title>
 </head>
 
 <body>
-  <h1>Add Transaction</h1>
-  <button onClick="addTransaction()">Add</button>
+	<div>
+		<label>Description: <input id="desc" placeholder="e.g., Coffee"></label>
+		<label>Amount (NZD): <input id="amt" type="number" step="0.01" value="1.00"></label>
+		<button onclick="addTransaction()">Add</button>
+	</div>
+
+	<h2>Transactions</h2>
+	<ul id="list"></ul>
+
+	<script>
+		// API endpoint
+		const API = 'http://localhost:3000';
+
+		async function addTransaction() {
+			const description = document.getElementById('desc').value.trim();
+			const nzAmount = Number(document.getElementById('amt').value);
+			if (!description || Number.isNaN(nzAmount)) return alert('Enter description and amount');
+
+			const amount_cents = Math.round(nzAmount * 100);
+			const res = await fetch(`${API}/transactions`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ description, amount_cents })
+			});
+			if (!res.ok) return alert('Failed to add transaction');
+
+			document.getElementById('desc').value = '';
+			document.getElementById('amt').value = '1.00';
+			loadTransactions();
+		}
+
+		async function getTransactions() {
+			const res = await fetch(`${API}/transactions`);
+			if (!res.ok) return alert('Failed to load transactions');
+			const rows = await res.json();
+			document.getElementById('list').innerHTML = rows.map(x =>
+				`<li>${new Date(x.occurred_at).toLocaleString()} — ${escapeHtml(x.description)} — $${(x.amount_cents / 100).toFixed(2)}</li>`
+			).join('');
+		}
+
+		function escapeHtml(s) {
+			return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+		}
+
+		getTransactions();
+
+	</script>
 </body>
-
-<script>
-  async function addTransaction() {
-    const response = await fetch('http://localhost:3000/transactions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        amount: 100,
-        description: 'Test Transaction'
-      })
-    });
-    if (response.ok) {
-      alert('Transaction added successfully!');
-    } else {
-      alert('Failed to add transaction.');
-    }
-  }
-
-  async function getTransactions() {
-    const response = await fetch('http://localhost:3000/transactions');
-    if (response.ok) {
-      const transactions = await response.json();
-      console.log('Transactions:', transactions);
-    } else {
-      console.error('Failed to fetch transactions.');
-    }
-  }
-</script>
 
 </html>

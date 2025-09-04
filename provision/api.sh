@@ -28,7 +28,6 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
 
 install -d -m 0755 "$APP_DIR"
-rsync -a --delete "$APP_SRC"/ "$APP_DIR"/
 
 # --- copy app to ext4 and install deps there ---
 rm -rf "$APP_DIR"
@@ -36,7 +35,7 @@ mkdir -p "$APP_DIR"
 rsync -a --delete "$APP_SRC/" "$APP_DIR/"
 
 cd "$APP_DIR"
-if [ -f package-lock.json ]; then
+if [ -f package-lock.json ]; then 	
   npm ci --omit=dev
 else
   npm install --omit=dev
@@ -61,4 +60,3 @@ UNIT
 
 systemctl daemon-reload
 systemctl enable --now hello-api
-systemctl --no-pager --full status hello-api || true
