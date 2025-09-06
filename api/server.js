@@ -1,57 +1,62 @@
 // this file will be for serving the Node/Express server iteself, serving api routes
 // for database interactions (using pg) for routes like /transactions
 
-// Express api for transactions
 const express = require('express');
-const cors = require('cors');
 const { Pool } = require('pg');
+
 const app = express();
-const port = process.env.PORT || 3000;
+app.use(express.json());
 
-// allow browser from web VM via localhost:8080
-app.use(cors({ origin: ['http://localhost:8080'] }));
-app.use(express.json()); // for parsing application/json bodies
-
-// DB config (Host only default, might look into override via system env vars)
+// Use a connection pool, client didn't work well with multiple requests
 const pool = new Pool({
-	host: process.env.DB_HOST || '10.10.10.10',
-	user: process.env.DB_USER || 'user',
-	password: process.env.DB_PASSWORD || 'supersecretpassword',
-	database: process.env.DB_NAME || 'budget'
+  host: process.env.DB_HOST || '192.168.56.13',
+  user: process.env.DB_USER || 'appuser',
+  password: process.env.DB_PASS || 'appsecret',
+  database: process.env.DB_NAME || 'budget',
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+// Simple health check endpoint
+app.get('/health', (req, res) => res.json({ ok: true }));
 
-// GET /transactions -> list latest
-app.get('/transactions', async (_req, res) => {
-	try {
-		const r = await pool.query(
-			'SELECT id, occurred_at, description, amount_cents FROM transactions ORDER BY occurred_at DESC'
-		);
-		res.json(r.rows);
-	} catch (e) {
-		console.error(e);
-		res.status(500).json({ error: 'db_query_failed' });
-	}
+// Transactions endpoints (gets all from database)
+app.get('/transactions', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, occurred_at, description, amount_cents FROM transactions ORDER BY occurred_at DESC'
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('GET /transactions failed:', e);
+    res.status(500).json({ error: 'db_error' });
+  }
 });
 
-
-// POST /transactions -> create
+// Create a new transaction
 app.post('/transactions', async (req, res) => {
-	try {
-		const { description, amount_cents } = req.body;
-		if (typeof description !== 'string' || !Number.isInteger(amount_cents)) {
-			return res.status(400).json({ error: 'bad_request' });
-		}
-		const r = await pool.query(
-			'INSERT INTO transactions(description, amount_cents) VALUES ($1,$2) RETURNING id, occurred_at, description, amount_cents',
-			[description, amount_cents]
-		);
-		res.status(201).json(r.rows[0]);
-	} catch (e) {
-		console.error(e);
-		res.status(500).json({ error: 'db_insert_failed' });
-	}
+  const { description, amount_cents } = req.body || {};
+  if (!description || typeof amount_cents !== 'number') {
+    return res.status(400).json({ error: 'bad_request' });
+  }
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO transactions(description, amount_cents) VALUES($1,$2) RETURNING id, occurred_at, description, amount_cents',
+      [description, amount_cents]
+    );
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    console.error('POST /transactions failed:', e);
+    res.status(500).json({ error: 'db_error' });
+  }
 });
 
-app.listen(port, () => console.log(`API listening on :${port}`));
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log(`API listening on ${PORT}`));
+
+// error handling: don't crash the process; surface errors in logs.
+process.on('unhandledRejection', err => console.error('unhandledRejection', err));
+process.on('uncaughtException', err => console.error('uncaughtException', err));
+process.on('warning', err => console.warn('warning', err));

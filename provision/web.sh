@@ -5,17 +5,27 @@
 set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-# avoid apt lock races
-systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer || true
-systemctl disable unattended-upgrades apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer || true
-while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ||
-	fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
-	echo "[web] apt/dpkg locked...waiting"
-	sleep 5
-done
+# attempt to apt race conditions
+systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
 
 apt-get update -y
 apt-get install -y nginx
-
-# Vagrantfile syncs ./web -> /var/www/html
 systemctl enable --now nginx
+
+# Reverse proxy to avoid CORS (same-origin /api)
+cat >/etc/nginx/sites-available/default <<'NG'
+server {
+  listen 80 default_server;
+  root /var/www/html;
+  index index.html;
+  location / {
+    try_files $uri $uri/ =404;
+  }
+  location /api/ {
+    proxy_pass http://192.168.56.11:3000/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+NG
+nginx -t && systemctl reload nginx
