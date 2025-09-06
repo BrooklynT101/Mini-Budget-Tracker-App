@@ -35,15 +35,19 @@ fi
 sudo -u postgres psql -v ON_ERROR_STOP=1 -d budget <<'SQL'
 CREATE TABLE IF NOT EXISTS transactions (
   id SERIAL PRIMARY KEY,
-  occurred_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  description TEXT NOT NULL,
-  amount_cents INT NOT NULL
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  amount_cents INT NOT NULL,
+  occurred_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- Seed once with stable ids
-INSERT INTO transactions (id, description, amount_cents) VALUES
-  (1,'Seeded item A', -100),
-  (2,'Seeded item B', 2500)
+INSERT INTO transactions (id, name, description, amount_cents, occurred_at) VALUES
+  (1,'Coffee', 'Coffee from cafe', 400, NOW()),
+  (2,'Groceries', 'Weekly groceries', 78291, NOW()),
+  (3,'Rent', 'Monthly rent', 120000, '2024-05-01 08:30:00'),
+  (4,'Internet', '', 6000, NOW()),
+  (5,'Electricity', 'Monthly electricity bill', 15000, '2024-05-28 10:00:00')
 ON CONFLICT (id) DO NOTHING;
 
 -- Keep sequence in sync
@@ -58,3 +62,12 @@ GRANT USAGE, SELECT, UPDATE ON SEQUENCE transactions_id_seq TO appuser;
 ALTER TABLE transactions OWNER TO appuser;
 ALTER SEQUENCE transactions_id_seq OWNER TO appuser;
 SQL
+
+# Had ChatGPT help with this part, to apply any new migrations on boot
+# Apply migrations if present (idempotent)
+if ls /db/migrations/*.sql >/dev/null 2>&1; then
+  for f in /db/migrations/*.sql; do
+    echo "Applying migration: $f"
+    sudo -u postgres psql -d budget -f "$f"
+  done
+fi

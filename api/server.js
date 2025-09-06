@@ -24,9 +24,12 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 // Transactions endpoints (gets all from database)
 app.get('/transactions', async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT id, occurred_at, description, amount_cents FROM transactions ORDER BY occurred_at DESC'
-    );
+    const query = `
+      SELECT id, occurred_at, description, amount_cents
+      FROM transactions
+      ORDER BY occurred_at DESC
+    `;
+    const { rows } = await pool.query(query);
     res.json(rows);
   } catch (e) {
     console.error('GET /transactions failed:', e);
@@ -36,20 +39,54 @@ app.get('/transactions', async (req, res) => {
 
 // Create a new transaction
 app.post('/transactions', async (req, res) => {
-  const { description, amount_cents } = req.body || {};
-  if (!description || typeof amount_cents !== 'number') {
-    return res.status(400).json({ error: 'bad_request' });
+  const { name, description, amount_cents, occurred_at } = req.body || {};
+
+  // Basic validation
+  // Name Check
+  if (!name || typeof name !== 'string' || name.length > 100) {
+    return res.status(400).json({ error: 'invalid name' });
   }
+
+  // Description Check - description can be null
+  if (description != null && (typeof description !== 'string' || description.length > 500)) {
+    return res.status(400).json({ error: 'invalid description' });
+  }
+
+  // Amount Check - must be an integer in cents
+  if (typeof amount_cents !== 'number' || !Number.isInteger(amount_cents)) {
+    return res.status(400).json({ error: 'invalid amount_cents' });
+  }
+
+  // Occurred At Check - can be null, defaults to NOW() in DB
+  if (occurred_at != null && isNaN(Date.parse(occurred_at))) {
+    return res.status(400).json({ error: 'invalid occurred_at' });
+  }
+
   try {
-    const { rows } = await pool.query(
-      'INSERT INTO transactions(description, amount_cents) VALUES($1,$2) RETURNING id, occurred_at, description, amount_cents',
-      [description, amount_cents]
-    );
+    const occurredAt = occurred_at ? new Date(occurred_at) : null;
+    const query = `
+      INSERT INTO transactions (name, description, amount_cents, occurred_at)
+      VALUES ($1, $2, $3, COALESCE($4, NOW()))
+      RETURNING id, occurred_at, name, description, amount_cents
+    `;
+    const parameters = [name, description, amount_cents, occurredAt];
+    const { rows } = await pool.query(query, parameters);
     res.status(201).json(rows[0]);
   } catch (e) {
     console.error('POST /transactions failed:', e);
-    res.status(500).json({ error: 'db_error' });
+    res.status(500).json({ error: 'db_error: insertion failed' });
   }
+});
+
+// Delete transaction
+app.delete('/transactions/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  // Basic validation
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid_id' });
+  
+  const { rowCount } = await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+  if (rowCount === 0) return res.status(404).json({ error: 'not_found' });
+  res.status(204).end();
 });
 
 // Start the server
