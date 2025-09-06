@@ -25,9 +25,14 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 app.get('/transactions', async (req, res) => {
   try {
     const query = `
-      SELECT id, occurred_at, description, amount_cents
+      SELECT
+        id,
+        occurred_at,
+        COALESCE(name, description) AS name,
+        description,
+        amount_cents
       FROM transactions
-      ORDER BY occurred_at DESC
+      ORDER BY occurred_at DESC, id DESC
     `;
     const { rows } = await pool.query(query);
     res.json(rows);
@@ -83,7 +88,7 @@ app.delete('/transactions/:id', async (req, res) => {
   const id = Number(req.params.id);
   // Basic validation
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid_id' });
-  
+
   const { rowCount } = await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
   if (rowCount === 0) return res.status(404).json({ error: 'not_found' });
   res.status(204).end();
