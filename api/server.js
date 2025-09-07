@@ -18,7 +18,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Simple health check endpoint
+// Simple health check endpoint - checks if server is running
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // Transactions endpoints (gets all from database)

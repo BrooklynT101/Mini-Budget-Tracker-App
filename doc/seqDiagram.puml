@@ -1,68 +1,95 @@
-@startuml
+@startuml 
 title Mini Budget Tracker - User <-> Web VM <-> API VM <-> DB VM
 
 actor User as U
-participant "Web VM" as W
-participant "API VM" as A
-participant "DB VMMySQL" as D
+participant "Web VM\nNgnix + Static UI" as W
+participant "API VM\nNode/Express" as A
+database "DB VM\nPostgreSQL" as D
 
-note right of U
+note over W,A
 Private Networks:
-- web (ip num i forgot)
-- api (ip num i forgot)
-- db  (ip num i forgot)
+- web 192.168.56.10:80
+- api 192.168.56.11:3000
+- db 192.168.56.12:3306
 end note
 
 
 == Load UI ==
 U -> W: GET http://localhost:3000/
-U <- W: HTML
+activate W
+U <- W: 200 index.html + JS + CSS
+deactivate W
 
 == Health (?) ==
 U -> W: GET /api/health
+activate W
 W -> A: proxy /api/health
+activate A
 A -> D: SELECT 1
+activate D
 D --> A: OK
-A --> W: OK
-W --> U: OK
+deactivate D
+A --> W: 200 { ok: true }
+deactivate A
+W --> U: 200 { ok: true }
+deactivate W
 
 == List transactions ==
 U -> W: GET /api/transactions
-W -> A: GET /transactions
-A -> D: SELECT (need to add params later)
-D --> A: trans
-A --> W: rows?
-W --> U: rows?
-U -> U: Render list
+W -> A: proxy GET /transactions
+A -> D: SELECT id, occurred_at, ... \nFROM transactions \nORDER BY occurred_at,...
+D --> A: rows[]
+A --> W: 200 rows[]
+W --> U: 200 rows[]
+U -> U: Render list in DOM
 
 == Add transaction ==
-U -> U: Fill form
+U -> U: Fill form + Click Submit
+U -> U: Validate form
 U -> W: POST /api/transactions
-W -> A: POST /transactions
-A -> A: ensure its all correct
-A -> D: INSERT 
-D --> A: created trans
-A --> W: 201 created trans
-W --> U: 201 created trans
-U -> U: add trans to list
+activate W
+W -> A: proxy POST /transactions
+activate A
+A -> A: Validate payload
+A -> D: INSERT INTO transactions (occurred_at, ... ) \nVALUES (?, ...)
+activate D
+D --> A: created row
+deactivate D
+A --> W: 201 created row
+deactivate A
+W --> U: 201 created row
+deactivate W
+U -> U: add row to list
 
 == Delete transaction ==
-U -> U: Click × on item
+U -> U: Click × on item (reads row id)
 U -> W: DELETE /api/transactions/{id}
-W -> A: DELETE /transactions/{id}
-A -> D: DELETE FROM transactions
-D --> A: remove thing
-A --> W: remove thing
-W --> U: remove thing
-U -> U: Remove thing from DOM
+activate W
+W -> A: proxy DELETE /transactions/{id}
+activate A
+A -> D: DELETE FROM transactions WHERE id = ?
+activate D
+D --> A: rowCount != 0
+deactivate D
+A --> W: 204 No Content
+deactivate A
+W --> U: 204 No Content
+deactivate W
+U -> U: Remove list item from DOM
 
 == Error path (?) ==
 U -> W: GET /api/transactions
+activate W
 W -> A: proxy
-A -> D: SELECT (something wrong?)
-D --> A: ERROR (some error)
-A --> W: (the error code?)
-W --> U: (the error code?)
+activate A
+A -> D: SELECT ...
+activate D
+D --> A: ERROR (e.g., missing column/table)
+deactivate D
+A --> W: 500 {error: "db_error" }
+deactivate A
+W --> U: 500
+deactivate W
 U -> U: Show "Starting up… retrying…"
 
 @enduml
