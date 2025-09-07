@@ -35,5 +35,13 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 
+# --- explicit firewall with ufw ---
+apt-get install -y ufw
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow from 192.168.56.10 to any port 3000 proto tcp    # WEB -> API only
+ufw allow "OpenSSH"
+ufw --force enable
+
 systemctl daemon-reload
 systemctl enable --now budget-api

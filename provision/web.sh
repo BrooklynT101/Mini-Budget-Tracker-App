@@ -12,6 +12,14 @@ apt-get update -y
 apt-get install -y nginx
 systemctl enable --now nginx
 
+# --- explicit firewall with ufw ---
+apt-get install -y ufw
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow "OpenSSH"
+ufw allow "Nginx HTTP"   # browser -> web: least privilege: only 80
+ufw --force enable
+
 # Reverse proxy to avoid CORS (same-origin /api)
 cat >/etc/nginx/sites-available/default <<'NG'
 server {

@@ -14,12 +14,17 @@ apt-get install -y postgresql postgresql-contrib
 PGCONF=/etc/postgresql/*/main/postgresql.conf
 PGHBA=/etc/postgresql/*/main/pg_hba.conf
 
-# Listen on all interfaces, allow the 192.168.56.0/24 host-only network
-sed -i "s/^#listen_addresses.*/listen_addresses = '*'/" $PGCONF
-if ! grep -q "192.168.56.0/24" $PGHBA; then
-  echo "host all all 192.168.56.0/24 md5" >> $PGHBA
+
+# Listen only on the private IP of the DB VM
+if ! grep -q "listen_addresses = '192.168.56.13'" "$PGCONF"; then
+  sed -ri "s|^#?listen_addresses\s*=.*|listen_addresses = '192.168.56.13'|" "$PGCONF"
 fi
-systemctl restart postgresql
+
+# Remove any broad subnet allows and only allow the API VM
+sed -i '/192\.168\.56\.0\/24/d' "$PGHBA"
+if ! grep -q "192.168.56.11/32" "$PGHBA"; then
+  echo "host all all 192.168.56.11/32 md5" >> "$PGHBA"
+fi
 
 # Create role if missing
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='appuser'" | grep -q 1; then
@@ -63,10 +68,19 @@ ALTER TABLE transactions OWNER TO appuser;
 ALTER SEQUENCE transactions_id_seq OWNER TO appuser;
 SQL
 
+# --- explicit firewall with ufw ---
+apt-get install -y ufw
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow from 192.168.56.11 to any port 5432 proto tcp   # API -> DB only
+ufw allow "OpenSSH"                                          # keep Vagrant ssh working
+ufw --force enable
+
 # Had ChatGPT help with this part, to apply any new migrations on boot
 # Apply migrations if present (idempotent)
-if ls /db/migrations/*.sql >/dev/null 2>&1; then
-  for f in /db/migrations/*.sql; do
+if ls /db/migrations.sql >/dev/null 2>&1; then
+  echo "Found migrations, applying..."
+  for f in /db/migrations.sql; do
     echo "Applying migration: $f"
     sudo -u postgres psql -d budget -f "$f"
   done
