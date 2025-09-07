@@ -1,7 +1,11 @@
+# This scripts allows you to apply database migrations to the PostgreSQL database
+# running inside the 'db' Vagrant VM. It copies a local 'migrations.sql' file to the
+# VM and applies it to the database while the machine is running.
+
 #!/usr/bin/env bash
 set -euo pipefail
 
-DB="${1:-budget}"   # pass 'budget_test' to target the test DB
+DB="${1:-budget}" # default database name
 GUEST_FILE="/opt/db/migrations.sql"
 
 if ! vagrant status db | grep -q running; then
