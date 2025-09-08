@@ -43,4 +43,15 @@ Vagrant.configure("2") do |config|
     web.vm.synced_folder "./web", "/var/www/html"
     web.vm.provision "shell", path: "provision/web.sh"
   end
+
+  # Run host-side smoke tests after provisioning finishes
+  # this has been disabled for now as I plan to migrate this into a separate script
+  # that runs independently of vagrant, either with continuous integration or manually.
+  # if ENV['SMOKE'] != '0' # allow SMOKE=0 vagrant provision to skip tests
+  #   config.trigger.after :provision do |t|
+  #     t.only_on = ["api"]             # fire once, after the 'api' VM provisions
+  #     t.info = "Running host smoke tests..."
+  #     t.run  = { inline: "bash ./scripts/verify-network.sh" }
+  #   end
+  # end
 end
