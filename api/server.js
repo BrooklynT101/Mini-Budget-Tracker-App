@@ -4,18 +4,21 @@
 const express = require('express');
 const { Pool } = require('pg');
 
+import dotenv from 'dotenv';
+dotenv.config({ path: '../.env' });     // shared
+
 const app = express();
 app.use(express.json());
 
 // Use a connection pool, client didn't work well with multiple requests
 const pool = new Pool({
-  host: process.env.DB_HOST || '192.168.56.13',
-  user: process.env.DB_USER || 'appuser',
-  password: process.env.DB_PASS || 'appsecret',
-  database: process.env.DB_NAME || 'budget',
-  max: 5,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  max: process.env.DB_MAX ? Number(process.env.DB_MAX) : 5,
+  idleTimeoutMillis: process.env.DB_IDLE_TIMEOUT ? Number(process.env.DB_IDLE_TIMEOUT) : 30000,
+  connectionTimeoutMillis: process.env.DB_CONN_TIMEOUT ? Number(process.env.DB_CONN_TIMEOUT) : 5000,
 });
 
 // Simple health check endpoint - checks if server is running
