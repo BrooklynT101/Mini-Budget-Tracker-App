@@ -1,0 +1,59 @@
+@startuml 
+title Mini Budget Tracker - User <-> Web VM <-> API VM <-> DB VM
+
+actor User as U
+participant "Web VM\nNgnix + Static UI" as W
+participant "API VM\nNode/Express" as A
+database "DB VM\nPostgreSQL" as D
+
+note over W,A
+Private Networks:
+- web 192.168.56.10:80
+- api 192.168.56.11:3000
+- db 192.168.56.12:3306
+end note
+
+== List transactions ==
+U -> W: GET /api/transactions
+W -> A: proxy GET /transactions
+A -> D: SELECT id, occurred_at, ... \nFROM transactions \nORDER BY occurred_at,...
+D --> A: rows[]
+A --> W: 200 rows[]
+W --> U: 200 rows[]
+U -> U: Render list in DOM
+
+== Add transaction ==
+U -> U: Fill form + Click Submit
+U -> U: Validate form
+U -> W: POST /api/transactions
+activate W
+W -> A: proxy POST /transactions
+activate A
+A -> A: Validate payload
+A -> D: INSERT INTO transactions (occurred_at, ... ) \nVALUES (?, ...)
+activate D
+D --> A: created row
+deactivate D
+A --> W: 201 created row
+deactivate A
+W --> U: 201 created row
+deactivate W
+U -> U: add row to list
+
+== Delete transaction ==
+U -> U: Click × on item (reads row id)
+U -> W: DELETE /api/transactions/{id}
+activate W
+W -> A: proxy DELETE /transactions/{id}
+activate A
+A -> D: DELETE FROM transactions WHERE id = ?
+activate D
+D --> A: rowCount != 0
+deactivate D
+A --> W: 204 No Content
+deactivate A
+W --> U: 204 No Content
+deactivate W
+U -> U: Remove list item from DOM
+
+@enduml
