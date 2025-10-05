@@ -1,8 +1,9 @@
 // this file will be for serving the Node/Express server iteself, serving api routes
 // for database interactions (using pg) for routes like /transactions
 
-const express = require('express');
-const { Pool } = require('pg');
+import express from 'express';
+import pkg from 'pg';
+const { Pool } = pkg;
 
 import dotenv from 'dotenv';
 dotenv.config({ path: '../env/local.env' });     // shared
@@ -99,7 +100,10 @@ app.delete('/transactions/:id', async (req, res) => {
 
 // Start the server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '192.168.56.11', () => console.log(`API listening on ${PORT}`));
+// previous line: app.listen(PORT, '192.168.56.11', () => console.log(`API listening on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
 // error handling: don't crash the process; surface errors in logs.
 process.on('unhandledRejection', err => console.error('unhandledRejection', err));

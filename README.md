@@ -116,7 +116,7 @@ curl http://localhost:8080/api/health
 ├─ doc/
 │  └─ seqDiagram.puml    # Sequence diagram explaining logic flow
 ├─ db/
-│  ├─ init.sql           # Schema + seeds applied on boot
+│  ├─ init_local.sql           # Schema + seeds applied on boot
 │  └─ migrations/        # Idempotent SQL, ran using db-migrate script
 └─ README.md             # What you're reading right now
 ```

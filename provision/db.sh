@@ -40,10 +40,10 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='budget
 	sudo -u postgres psql -c "CREATE DATABASE budget OWNER appuser;"
 fi
 
-# Initial setup if init.sql is present (only on first boot)
-if [ -f /opt/db/init.sql ]; then
-	echo "Beginning initial setup from /opt/db/init.sql"
-	sudo -u postgres psql -d budget -f /opt/db/init.sql
+# Initial setup if init_local.sql is present (only on first boot)
+if [ -f /opt/db/init_local.sql ]; then
+	echo "Beginning initial setup from /opt/db/init_local.sql"
+	sudo -u postgres psql -d budget -f /opt/db/init_local.sql
 fi
 
 # --- explicit firewall with ufw ---
