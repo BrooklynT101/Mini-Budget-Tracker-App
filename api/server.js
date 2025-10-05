@@ -101,9 +101,8 @@ app.delete('/transactions/:id', async (req, res) => {
 // Start the server
 const PORT = process.env.PORT || 3000;
 // previous line: app.listen(PORT, '192.168.56.11', () => console.log(`API listening on ${PORT}`));
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+
 
 // error handling: don't crash the process; surface errors in logs.
 process.on('unhandledRejection', err => console.error('unhandledRejection', err));
