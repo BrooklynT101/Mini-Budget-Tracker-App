@@ -5,7 +5,7 @@ const express = require('express');
 const { Pool } = require('pg');
 
 import dotenv from 'dotenv';
-dotenv.config({ path: '../.env' });     // shared
+dotenv.config({ path: '../env/local.env' });     // shared
 
 const app = express();
 app.use(express.json());
