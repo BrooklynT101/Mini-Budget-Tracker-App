@@ -18,12 +18,13 @@ const pool = new Pool({
 	user: process.env.DB_USER,
 	password: process.env.DB_PASS || process.env.DB_PASSWORD,
 	database: process.env.DB_NAME,
-	// CGPT suggested to add this to solve a Aurora SSL connection issue:
 	port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
-	ssl: {
-		ca: fs.readFileSync('/etc/ssl/certs/rds-combined-ca-bundle.pem').toString(),
-		rejectUnauthorized: true
-	}
+	// CGPT suggested to add this to solve a Aurora SSL connection issue:
+	// ssl: {
+	// 	ca: fs.readFileSync('/etc/ssl/certs/rds-combined-ca-bundle.pem').toString(),
+	// 	rejectUnauthorized: true
+	// }
+	ssl: { rejectUnauthorized: false }
 });
 
 // Simple health check endpoint - checks if server is running
@@ -78,15 +79,26 @@ app.post('/transactions', async (req, res) => {
 	try {
 		const occurredAt = occurred_at ? new Date(occurred_at) : null;
 		const query = `
-      INSERT INTO transactions (name, description, amount_cents, occurred_at)
-      VALUES ($1, $2, $3, COALESCE($4, NOW()))
-      RETURNING id, occurred_at, name, description, amount_cents
-    `;
+			INSERT INTO transactions (name, description, amount_cents, occurred_at)
+			VALUES ($1, $2, $3, COALESCE($4, NOW()))
+			RETURNING id, occurred_at, name, description, amount_cents
+		`;
 		const parameters = [name, description, amount_cents, occurredAt];
 		const { rows } = await pool.query(query, parameters);
 		res.status(201).json(rows[0]);
 	} catch (e) {
-		console.error('POST /transactions failed:', e);
+		// console.error('POST /transactions failed:', e);
+		console.error('POST /transactions failed:', {
+			message: e.message,
+			code: e.code,        // e.g., '23502', '23505', '22P02', ...
+			detail: e.detail,
+			table: e.table,
+			column: e.column,
+			constraint: e.constraint,
+			where: e.where,
+			schema: e.schema,
+		});
+		res.st
 		res.status(500).json({ error: 'db_error: insertion failed' });
 	}
 });

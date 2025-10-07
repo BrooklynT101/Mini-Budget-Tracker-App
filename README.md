@@ -1,4 +1,7 @@
-# Mini Budget Tracker (Multi-VM, Vagrant)
+# Mini Budget Tracker (Multi-VM, Vagrant, AWS Cloud Deployment)
+
+## 1. Overview
+The **Mini Budget Tracker** is a lightweight full‑stack budgeting app demonstrating cloud deployment and system isolation principles. Originally designed with Vagrant VMs, it has been migrated to a **Docker‑based AWS architecture** using **EC2**, **Aurora PostgreSQL (RDS)**, and **Docker Hub** for image management.
 
 ### A small 3-VM app demonstrating portable build & deployment with virtualisation:
 Focus: unattended builds, isolation, reproducibility, and a clean developer workflow.
@@ -15,7 +18,25 @@ Focus: unattended builds, isolation, reproducibility, and a clean developer work
 
 ---
 
-## 2) Architecture
+## 2. Cloud Architecture
+
+| Component | AWS Service | Purpose | Access |
+|------------|--------------|----------|--------|
+| **Web Tier** | EC2 (Amazon Linux 2023) | Runs Nginx container serving static frontend | Public (port 80) |
+| **API Tier** | EC2 (Amazon Linux 2023) | Runs Node.js Express API container | Private (port 3000) |
+| **Database** | Amazon Aurora (PostgreSQL Compatible) | Persistent data store | Private subnet only |
+| **Container Registry** | Docker Hub | Stores and distributes container images | Public |
+
+### Network Layout
+```
+User → [Web EC2:80] → [API EC2:3000] → [Aurora RDS:5432]
+```
+
+Security groups enforce one‑directional communication (Web → API → DB).
+
+---
+
+## 4. 3VM Architecture
 
 **Request path:**
 
@@ -55,6 +76,17 @@ Vagrant base box
 
 **Total project storage: ~9.35GB** 
 *note that this figure will increase with additional data being written to the database, as well as other additions to source code* 
+
+### Cost Estimation (us‑east‑1)
+
+| Resource | Type | Monthly Est. |
+|-----------|------|--------------|
+| EC2 Web | t2.micro | $7.50 |
+| EC2 API | t2.micro | $7.50 |
+| Aurora PostgreSQL | db.t3.micro | $15–18 |
+| **Total** |  | **≈ $30–35 / month** |
+
+---
 
 ### Windows notes
 If VMs won’t start or are slow: disable Hyper-V / WSL2 features for VirtualBox.
@@ -140,6 +172,19 @@ DB_NAME=budget
 - web → api: Nginx proxy to http://192.168.56.11:3000
 - api → db: 192.168.56.13:5432 (private subnet)
 
+### Verification
+
+Test connectivity after deployment:
+```bash
+curl http://<CHANGE THIS TO WEB IP>/api/health
+curl http://<CHANGE THIS TO WEB IP>/api/version
+```
+Expected output:
+```json
+{"status":"ok"}
+{"version":"0.1.0"}
+```
+
 **Isolation**
 - DB is not exposed to the host; reachable only on the private network.
 - Optional hardening with UFW (allow only required ports).
@@ -204,6 +249,12 @@ Some sections of the code in this project was adapted and inspired by sources fo
 
 Additionally large language models (such as [ChatGPT 5.0](https://chatgpt.com/), and [VSC's Copilot](https://code.visualstudio.com/docs/copilot/overview) were used in debugging multiple syntax errors due to the fact that this technology is still relatively new to me, and the need to apply specific modifiers to certain commands is not something I know offhand. Though largely in whole this project was developed myself.
 
+---
+
+## Future Work
+
+- Add CloudWatch monitoring & logs.  
+- Use S3 + CloudFront for static hosting.
 ---
 
 ## 10) Support
