@@ -1,20 +1,19 @@
 # Mini Budget Tracker (Multi-VM, Vagrant, AWS Cloud Deployment)
 
 ## 1. Overview
-The **Mini Budget Tracker** is a lightweight full‑stack budgeting app demonstrating cloud deployment and system isolation principles. Originally designed with Vagrant VMs, it has been migrated to a **Docker‑based AWS architecture** using **EC2**, **Aurora PostgreSQL (RDS)**, and **Docker Hub** for image management.
+The **Mini Budget Tracker** is a lightweight full-stack budgeting application demonstrating how a three-tier architecture can evolve from local virtual machines into a **cloud-native deployment** on **AWS**.
 
-### A small 3-VM app demonstrating portable build & deployment with virtualisation:
-Focus: unattended builds, isolation, reproducibility, and a clean developer workflow.
-- **web** VM: static frontend via Nginx (serves `/` and proxies `/api/*`)
-- **api** VM: Node/Express REST API
-- **db** VM: PostgreSQL (persisted data)
----
+Originally developed using **Vagrant** and **VirtualBox**, the project was extended to include *Dockerized* services hosted on **AWS** **EC2** with a managed **Aurora PostgreSQL** database.
+The goal is to showcase **secure multi-tier design**, **network isolation**, and **infrastructure migration** from local to cloud.
 
-## 1) Overview
+The idea of this project was to experiment with:
 
-- **Goal:** Show clean, automated provisioning across multiple VMs with data persistence and a minimal testable app.
-- **User story:** View/add/remove transactions; data stored in PostgreSQL.
-- **Demo Goal:** `vagrant up` → services come online unattended → seeded data visible → simple POST works.
+- Migrations from local VMs → containerized AWS services.
+- Initialising EC2/RDS (Aurora PostgreSQL) instances. 
+- A method of pulling from a built Docker image stored in Docker Hub.
+- Secure networking using layered access control (Web → API → DB).
+
+Manual deployment documentation for maintainability and reproducibility.
 
 ---
 
@@ -36,7 +35,7 @@ Security groups enforce one‑directional communication (Web → API → DB).
 
 ---
 
-## 4. 3VM Architecture
+## 4. 3-VM Architecture
 
 **Request path:**
 
@@ -48,16 +47,16 @@ Browser → web (Nginx, :80)
                                           ---→ db (PostgreSQL, :5432)
 ```
 
-| VM/Hostname | Private IP      | Services     | Host Port-Forwards       |
-| ----------- | --------------- | -------------- | ------------------------ |
-| `web`       | `192.168.56.10` | Nginx :80      | `localhost:8080 → 80`    |
-| `api`       | `192.168.56.11` | Express :3000  | *(none)* (via web proxy) |
-| `db`        | `192.168.56.13` | Postgres :5432 | *(none)* (private only)  |
+| VM/Hostname | Private IP         | Services       | Host Port-Forwards       |
+| ----------- | ------------------ | -------------- | ------------------------ |
+| `web`       | `<WEB_PRIVATE_IP>` | Nginx :80      | `localhost:8080 → 80`    |
+| `api`       | `<API_PRIVATE_IP>` | Express :3000  | *(none)* (via web proxy) |
+| `db`        | `<DB_PRIVATE_IP>`  | Postgres :5432 | *(none)* (private only)  |
 
 ---
 
-## 3) Prerequisites
-
+## Prerequisites - 
+Local 3-VM Setup:
 - Host OS: Windows 11 (tested), macOS(tested)
     - Note that Linux has not been tested with this system and may misbehave.
 - Virtualisation: VirtualBox 7.x 
@@ -77,7 +76,7 @@ Vagrant base box
 **Total project storage: ~9.35GB** 
 *note that this figure will increase with additional data being written to the database, as well as other additions to source code* 
 
-### Cost Estimation (us‑east‑1)
+### Cloud Hosting Cost Estimation (us‑east‑1)
 
 | Resource | Type | Monthly Est. |
 |-----------|------|--------------|
@@ -126,7 +125,7 @@ curl http://localhost:8080/api/health
 
 ---
 
-## 5) Repository Structure
+## Repository Structure
 ```
 .
 ├─ Vagrantfile
@@ -139,38 +138,33 @@ curl http://localhost:8080/api/health
 │  ├─ verify-db.sh       # Smoke test script for ensuring db integrity
 │  └─ verify-network.sh  # Smoke test script for testing firewall and routes
 ├─ web/
+│  ├─ Dockerfile             
 │  ├─ app.js             # Script for handling frontend user interaction
 │  ├─ index.html         # Static UI (fetches /api/transactions)
+│  ├─ nginx.conf         # Config file for Nginx
 |  └─ styles.css         # Simple css styling for the page
 ├─ api/
+│  ├─ package-lock.json       
 │  ├─ package.json       
+│  ├─ Dockerfile         
 │  └─ server.js          # Express routes: /health, /transactions (GET/POST/DELETE)
 ├─ doc/
 │  └─ seqDiagram.puml    # Sequence diagram explaining logic flow
+├─ env/
+│  └─ prod.api.env       # Here is where you would define your environment variables
 ├─ db/
-│  ├─ init_local.sql           # Schema + seeds applied on boot
+│  ├─ init_local.sql     # Schema + seeds applied on boot
+│  ├─ init_prod.sql      # Schema + seeds applied on AWS deployment
 │  └─ migrations/        # Idempotent SQL, ran using db-migrate script
 └─ README.md             # What you're reading right now
 ```
 ---
 
----
 
-## 6) Configuration
-
-**API environment**
-This is defined in `sever.js` for now, though will eventually be migrated into a seperate environment variable to support other developers environments.
-```
-PORT=3000
-DB_HOST=192.168.56.13
-DB_USER=appuser
-DB_PASS=appsecret
-DB_NAME=budget
-```
-
+## Configuration
 **Networking**
-- web → api: Nginx proxy to http://192.168.56.11:3000
-- api → db: 192.168.56.13:5432 (private subnet)
+- web → api: Nginx proxy to *<WEB_PRIVATE_IP>*:3000
+- api → db: *<API_PRIVATE_IP>*:5432 (private subnet)
 
 ### Verification
 
@@ -191,7 +185,8 @@ Expected output:
 
 ---
 
-## 7) Operational Runbook
+## Operational Runbook
+**3-VM Setup**
 These commands can be used to start the virtual machines as well as checking statuses/health of the various systems
 ### Lifecycle
 ```
@@ -219,6 +214,8 @@ vagrant ssh db  -c "sudo -u postgres psql -d budget -c 'select count(*) from tra
 vagrant ssh api -c "sudo systemctl restart budget-api"
 ```
 
+**AWS Cloud Deployment**
+
 
 ---
 
@@ -228,7 +225,7 @@ With a blank install, there is a chance that the API and DB VMs don't connect, I
 vagrant reload api db --provision
 ```
 ### Additional Issues that arose:
-- **Blank UI or 502:** Nginx proxy IP/port mismatch with API; ensure `192.168.56.11:3000` (*or your own defined IP*) is correct.
+- **Blank UI or 502:** Nginx proxy IP/port mismatch with API; ensure **your own defined IP** is correct.
 - **API unreachable:** Check service status and logs:
 ```
 vagrant ssh api -c "systemctl status budget-api --no-pager"
@@ -246,6 +243,7 @@ Some sections of the code in this project was adapted and inspired by sources fo
 **Nginx reverse proxy block** adapted from [user3003510 on Stack Overflow](https://stackoverflow.com/questions/42452101/nginx-reverse-proxy-config) and [hillefied on ProxMox](https://forum.proxmox.com/threads/using-nginx-as-reverse-proxy-externally.116127)
 **Multiple VM routing skeleton** inspired by [David Eyers Lab Example](https://altitude.otago.ac.nz/cosc349/vagrant-multivm)
 **UFW Firewall implementation** inspired by [Tony Teaches Techs' tutorial](https://www.youtube.com/watch?v=68GTL7djIMI&t=81s)
+**Docker Setup Boilerplate** adapted from [Sloth](https://www.youtube.com/watch?v=DQdB7wFEygo&t=418s)
 
 Additionally large language models (such as [ChatGPT 5.0](https://chatgpt.com/), and [VSC's Copilot](https://code.visualstudio.com/docs/copilot/overview) were used in debugging multiple syntax errors due to the fact that this technology is still relatively new to me, and the need to apply specific modifiers to certain commands is not something I know offhand. Though largely in whole this project was developed myself.
 
